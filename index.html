@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Is It Snowing In Athens?</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --yes-bg: #2b6da8;
+      --no-bg: #ffffff;
+      --yes-text: #ffffff;
+      --no-text: #000000;
+      --font-main: -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: var(--font-main);
+    }
+    body.yes {
+      background: radial-gradient(circle at top, #5fa9ff, var(--yes-bg));
+      color: var(--yes-text);
+    }
+    body.no {
+      background: var(--no-bg);
+      color: var(--no-text);
+    }
+    .wrapper {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem 1rem;
+      box-sizing: border-box;
+    }
+    #answer {
+      font-size: clamp(5rem, 18vw, 12rem);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      margin: 0 0 1rem;
+    }
+    #details {
+      font-size: 1.1rem;
+      margin-bottom: 0.75rem;
+    }
+    #updated {
+      font-size: 0.85rem;
+      opacity: 0.7;
+      margin-bottom: 2rem;
+    }
+    #footer {
+      font-size: 0.85rem;
+      opacity: 0.8;
+    }
+    a {
+      color: inherit;
+    }
+  </style>
+</head>
+<body class="no">
+  <div class="wrapper">
+    <div id="answer">...</div>
+    <div id="details">Checking the weather in Athens, GA...</div>
+    <div id="updated"></div>
+    <div id="footer">
+      Data from <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer">Open‑Meteo</a> &middot;
+      <a href="https://www.wunderground.com/forecast/us/ga/athens" target="_blank" rel="noopener noreferrer">
+        Full forecast
+      </a>
+    </div>
+  </div>
+
+  <script>
+    const SNOW_CODES = new Set([71, 73, 75, 77, 85, 86]);
+
+    async function fetchWeather() {
+      const url = "https://api.open-meteo.com/v1/forecast"
+        + "?latitude=33.95&longitude=-83.38"
+        + "&current=temperature_2m,weather_code,precipitation";
+
+      try {
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+
+        const current = data.current;
+        const tempF = cToF(current.temperature_2m);
+        const code = current.weather_code;
+        const precip = current.precipitation;
+
+        const snowing = SNOW_CODES.has(code) && precip > 0;
+
+        updatePage(snowing, tempF, code);
+      } catch (err) {
+        document.getElementById("answer").textContent = "NO";
+        document.getElementById("details").textContent =
+          "Error checking the weather. Assuming it is not snowing in Athens, GA.";
+        document.body.classList.remove("yes");
+        document.body.classList.add("no");
+        document.getElementById("updated").textContent = "";
+        console.error(err);
+      }
+    }
+
+    function cToF(c) {
+      return Math.round((c * 9) / 5 + 32);
+    }
+
+    function describeWeatherCode(code) {
+      // Minimal mapping just for display
+      const map = {
+        0: "Clear sky",
+        1: "Mainly clear",
+        2: "Partly cloudy",
+        3: "Overcast",
+        45: "Foggy",
+        48: "Depositing rime fog",
+        51: "Light drizzle",
+        53: "Drizzle",
+        55: "Heavy drizzle",
+        61: "Light rain",
+        63: "Rain",
+        65: "Heavy rain",
+        71: "Light snow",
+        73: "Snow",
+        75: "Heavy snow",
+        77: "Snow grains",
+        80: "Rain showers",
+        81: "Rain showers",
+        82: "Violent rain showers",
+        85: "Snow showers",
+        86: "Heavy snow showers"
+      };
+      return map[code] || "Current conditions";
+    }
+
+    function updatePage(snowing, tempF, code) {
+      const answerEl = document.getElementById("answer");
+      const detailsEl = document.getElementById("details");
+      const updatedEl = document.getElementById("updated");
+
+      if (snowing) {
+        document.body.classList.remove("no");
+        document.body.classList.add("yes");
+        answerEl.textContent = "YES!";
+      } else {
+        document.body.classList.remove("yes");
+        document.body.classList.add("no");
+        answerEl.textContent = "NO";
+      }
+
+      const desc = describeWeatherCode(code);
+      detailsEl.textContent =
+        desc + " in Athens, GA, with a temperature of " + tempF + "°F.";
+
+      const now = new Date();
+      updatedEl.textContent =
+        "Last updated " + now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) +
+        " local time.";
+    }
+
+    // Initial fetch
+    fetchWeather();
+
+    // Refresh every 15 minutes (900000 ms)
+    setInterval(fetchWeather, 5 * 60 * 1000);
+  </script>
+</body>
+</html>
