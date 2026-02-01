@@ -82,7 +82,7 @@
       </a> 
       <br>
       <br>      
-      <a href="/about.html" target="_blank" rel="noopener noreferrer">
+      <a href="https://chrisyetter.github.io/isitsnowinginathens.github.io/">
         About
       </a>
     </div>
@@ -158,22 +158,24 @@
       return map[code] || "Current conditions";
     }
 
-    function updatePage(snowing, tempF, code) {
-      const answerEl = document.getElementById("answer");
-      const detailsEl = document.getElementById("details");
-      const updatedEl = document.getElementById("updated");
+function updatePage(snowing, tempF, code) {
+  const answerEl = document.getElementById("answer");
+  const detailsEl = document.getElementById("details");
+  const updatedEl = document.getElementById("updated");
 
-      if (snowing) {
-        document.body.classList.remove("no");
-        document.body.classList.add("yes");
-        answerEl.textContent = "YES!";
-        startSnow();
-      } else {
-        document.body.classList.remove("yes");
-        document.body.classList.add("no");
-        answerEl.textContent = "NO";
-        stopSnow();
-      }
+  if (snowing) {
+    document.body.classList.remove("no");
+    document.body.classList.add("yes");
+    answerEl.textContent = "YES!";
+    document.title = "❄️ Yes! It is snowing in Athens";
+    startSnow();
+  } else {
+    document.body.classList.remove("yes");
+    document.body.classList.add("no");
+    answerEl.textContent = "NO";
+    document.title = "❌ No. It is not snowing in Athens";
+    stopSnow();
+  }
 
       const desc = describeWeatherCode(code);
       detailsEl.textContent =
