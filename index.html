@@ -78,15 +78,16 @@
   <div class="wrapper">
     <div id="answer">...</div>
     <div id="details">Checking the weather in Athens, GA...</div>
-    <div id="updated"></div>
-    <div id="updated"></div>
 <div id="last-snow" style="font-size: 0.9rem; margin-top: 1rem; opacity: 0.9;">
-  It last snowed in Athens, GA on <span id="last-snow-date">Checking records...</span>
+  Most recent snowfall observed on <span id="last-snow-date">Checking records...</span>
 </div>
+<br>
 <div id="footer">
-  <br><br><br>    
-      <a href="https://chrisyetter.github.io/isitsnowinginathens.github.io/about.html">
-        About this website
+<a href="https://chrisyetter.github.io/isitsnowinginathens.github.io/about.html"
+   style="color: #ccc;">
+  About this website
+</a>
+
     </div>
   </div>
 
@@ -184,9 +185,7 @@ function updatePage(snowing, tempF, code) {
         desc + " in Athens, GA, with a temperature of " + tempF + "°F.";
 
       const now = new Date();
-      updatedEl.textContent =
-        "Current weather conditions last updated " + now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) +
-        " local time.";
+     
     }
 
     // Snow animation functions
