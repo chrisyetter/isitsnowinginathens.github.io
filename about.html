@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>About – Is It Snowing In Athens?</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #000000;
+      --font-main: -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: var(--font-main);
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrapper {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem 1rem;
+      box-sizing: border-box;
+    }
+    h1 {
+      font-size: clamp(2.5rem, 8vw, 4rem);
+      font-weight: 700;
+      margin: 0 0 1rem;
+      letter-spacing: 0.08em;
+    }
+    .credits {
+      font-size: 1.2rem;
+      line-height: 1.6;
+      max-width: 600px;
+      opacity: 0.9;
+    }
+    a {
+      color: var(--text);
+      text-decoration: none;
+      border-bottom: 1px solid currentColor;
+    }
+    a:hover {
+      opacity: 0.8;
+    }
+    #footer {
+      margin-top: 3rem;
+      font-size: 0.9rem;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <h1>About</h1>
+    <div class="credits">
+      <p>Recreated in 2026 from the original 2014 site by <a href="https://www.linkedin.com/in/jared-rackley-55445227" target="_blank">Jared Rackley</a>.</p>
+      <p><strong>Weather Data API:</strong> <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer">Open‑Meteo</a></p>
+      <p><strong>Website Hosting:</strong> <a href="https://github.com/chrisyetter/isitsnowinginathens.github.io" target="_blank" rel="noopener noreferrer">GitHub Pages</a></p>
+      <p><strong>DNS & Analytics:</strong> <a href="https://cloudflare.com" target="_blank" rel="noopener noreferrer">Cloudflare</a></p>
+    </div>
+    <div id="footer">
+      <a href="/">← Back</a>
+    </div>
+  </div>
+</body>
+</html>
