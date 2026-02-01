@@ -55,6 +55,9 @@
       font-size: 0.85rem;
       opacity: 0.8;
     }
+    #last-snow.yes {
+      display: none;
+    }    
     a {
       color: inherit;
     }
@@ -76,19 +79,19 @@
     <div id="answer">...</div>
     <div id="details">Checking the weather in Athens, GA...</div>
     <div id="updated"></div>
-    <div id="footer">
-      <a href="https://www.wunderground.com/forecast/us/ga/athens" target="_blank" rel="noopener noreferrer">
-        Weather Underground Forecast
-      </a> 
-      <br>
-      <br>      
+    <div id="updated"></div>
+<div id="last-snow" style="font-size: 0.9rem; margin-top: 1rem; opacity: 0.9;">
+  It last snowed in Athens, GA on <span id="last-snow-date">Checking records...</span>
+</div>
+<div id="footer">
+  <br><br><br>    
       <a href="https://chrisyetter.github.io/isitsnowinginathens.github.io/about.html">
-        About  
+        About this website
     </div>
   </div>
 
   <script>
-    const SNOW_CODES = new Set([71, 73, 75, 77, 85, 86]);
+    const SNOW_CODES = new Set([71, 73, 75, 77, 85, 86, 0]);
 
     // Snow animation globals
     let canvas, ctx, flakes = [], animationId;
@@ -116,7 +119,7 @@
       } catch (err) {
         document.getElementById("answer").textContent = "NO";
         document.getElementById("details").textContent =
-          "Error checking the weather. Assuming it is not snowing in Athens, GA.";
+          "Error checking the weather. Odds are it is not snowing in Athens, GA.";
         document.body.classList.remove("yes");
         document.body.classList.add("no");
         document.getElementById("updated").textContent = "";
@@ -182,7 +185,7 @@ function updatePage(snowing, tempF, code) {
 
       const now = new Date();
       updatedEl.textContent =
-        "Last updated " + now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) +
+        "Current weather conditions last updated " + now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) +
         " local time.";
     }
 
@@ -260,6 +263,53 @@ function updatePage(snowing, tempF, code) {
 
     // Refresh every 5 minutes (300000 ms)
     setInterval(fetchWeather, 5 * 60 * 1000);
+
+async function fetchHistoricalSnow() {
+  const displayEl = document.getElementById("last-snow-date");
+  
+  // 1. Get current date in YYYY-MM-DD format
+  const today = new Date().toISOString().split('T')[0];
+  
+  const url = `https://historical-forecast-api.open-meteo.com/v1/forecast`
+    + `?latitude=33.95&longitude=-83.38`
+    + `&start_date=2026-01-01&end_date=${today}`
+    + `&hourly=snowfall&timezone=America%2FNew_York`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Historical API Error");
+    const data = await res.json();
+
+    const times = data.hourly.time;
+    const snowfall = data.hourly.snowfall;
+    let foundDate = null;
+
+    // 2. Loop backwards from the end of the array to find the most recent snow
+    for (let i = snowfall.length - 1; i >= 0; i--) {
+      if (snowfall[i] > 0) {
+        foundDate = new Date(times[i]);
+        break;
+      }
+    }
+
+    if (foundDate) {
+      // Format as "January 15, 2024"
+      displayEl.textContent = foundDate.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } else {
+      displayEl.textContent = "None recorded since Jan 2022";
+    }
+  } catch (err) {
+    console.error("Historical fetch failed:", err);
+    displayEl.textContent = "Unavailable";
+  }
+}
+
+// Call this once on page load
+fetchHistoricalSnow();    
 </script>
 
 </body>
