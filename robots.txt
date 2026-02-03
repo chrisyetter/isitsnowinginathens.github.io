@@ -1,0 +1,3 @@
+Sitemap: https://isitsnowinginathens.com/sitemap.xml
+User-agent: *
+Disallow:
