@@ -99,49 +99,110 @@
     const MAX_FLAKES = 100;
     const FLAKE_COLORS = ['#ffffff', '#f8f8ff', '#e6e6fa'];
 
-    // Try the main API first, then fall back to another Open-Meteo host if it's
-    // unreachable, so a single-host outage doesn't break the whole page.
-    const CURRENT_ENDPOINTS = [
+    // Primary provider: Open-Meteo. Try the main host first, then another
+    // Open-Meteo host, so a single-host outage doesn't break the whole page.
+    const OPEN_METEO_ENDPOINTS = [
       "https://api.open-meteo.com/v1/forecast",
       "https://historical-forecast-api.open-meteo.com/v1/forecast"
     ];
 
-    async function fetchWeather() {
+    // If Open-Meteo doesn't respond within this window, give up on it and fall
+    // back to weather.gov. Open-Meteo intermittently hangs rather than erroring.
+    const OPEN_METEO_TIMEOUT_MS = 10000;
+
+    // Fallback provider: the US National Weather Service. No API key, no account,
+    // and CORS-enabled so it works from the browser. KAHN is the nearest official
+    // observation station to Athens, GA (Athens/Ben Epps Airport).
+    // NOTE: this fallback is intentionally only for CURRENT conditions. The
+    // historical "most recent snowfall" lookup below still uses Open-Meteo only.
+    const NWS_OBSERVATION_URL =
+      "https://api.weather.gov/stations/KAHN/observations/latest";
+
+    // fetch() with an abort-based timeout, so a hung request can't stall the page.
+    function fetchWithTimeout(url, opts, timeoutMs) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      return fetch(url, Object.assign({}, opts, { signal: controller.signal }))
+        .finally(() => clearTimeout(timer));
+    }
+
+    async function fetchFromOpenMeteo() {
       const query = "?latitude=33.95&longitude=-83.38"
         + "&current=temperature_2m,weather_code,precipitation";
 
-      let data = null, lastErr = null;
-      for (const base of CURRENT_ENDPOINTS) {
+      let lastErr = null;
+      for (const base of OPEN_METEO_ENDPOINTS) {
         try {
-          const res = await fetch(base + query, { cache: "no-store" });
+          const res = await fetchWithTimeout(
+            base + query, { cache: "no-store" }, OPEN_METEO_TIMEOUT_MS);
           if (!res.ok) throw new Error("HTTP " + res.status);
           const json = await res.json();
           if (!json.current) throw new Error("no current data in response");
-          data = json;
-          break;
+          const c = json.current;
+          return {
+            snowing: SNOW_CODES.has(c.weather_code),
+            tempF: cToF(c.temperature_2m),
+            code: c.weather_code
+          };
         } catch (err) {
           lastErr = err;
         }
       }
+      throw lastErr || new Error("Open-Meteo unavailable");
+    }
 
-      if (!data) {
+    // weather.gov reports present weather as structured codes plus a text
+    // description; treat snow/sleet/flurries in either as "snowing".
+    function nwsIsSnowing(props) {
+      const codes = (props.presentWeather || [])
+        .map(w => (w.weather || "").toLowerCase());
+      if (codes.some(w => w.includes("snow") || w.includes("sleet"))) return true;
+      return /snow|sleet|flurr/i.test(props.textDescription || "");
+    }
+
+    async function fetchFromNWS() {
+      const res = await fetch(NWS_OBSERVATION_URL, {
+        cache: "no-store",
+        headers: { "Accept": "application/geo+json" }
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const props = (await res.json()).properties;
+      if (!props || !props.temperature || props.temperature.value == null) {
+        throw new Error("no temperature in NWS observation");
+      }
+      return {
+        snowing: nwsIsSnowing(props),
+        tempF: cToF(props.temperature.value), // weather.gov reports °C
+        code: null
+      };
+    }
+
+    async function fetchWeather() {
+      let result = null;
+      try {
+        result = await fetchFromOpenMeteo();
+      } catch (primaryErr) {
+        console.warn("Open-Meteo failed/timed out, falling back to weather.gov:",
+          primaryErr);
+        try {
+          result = await fetchFromNWS();
+        } catch (fallbackErr) {
+          console.error("All weather providers failed:", fallbackErr);
+        }
+      }
+
+      if (!result) {
         document.getElementById("answer").textContent = "NO";
         document.getElementById("details").textContent =
           "Error checking the weather. Odds are it is not snowing in Athens, GA.";
         document.body.classList.remove("yes");
         document.body.classList.add("no");
         document.getElementById("updated").textContent = "";
-        console.error("All weather endpoints failed:", lastErr);
         stopSnow();
         return;
       }
 
-      const current = data.current;
-      const tempF = cToF(current.temperature_2m);
-      const code = current.weather_code;
-      const snowing = SNOW_CODES.has(code);
-
-      updatePage(snowing, tempF, code);
+      updatePage(result.snowing, result.tempF, result.code);
     }
 
     function cToF(c) {
