@@ -99,34 +99,49 @@
     const MAX_FLAKES = 100;
     const FLAKE_COLORS = ['#ffffff', '#f8f8ff', '#e6e6fa'];
 
+    // Try the main API first, then fall back to another Open-Meteo host if it's
+    // unreachable, so a single-host outage doesn't break the whole page.
+    const CURRENT_ENDPOINTS = [
+      "https://api.open-meteo.com/v1/forecast",
+      "https://historical-forecast-api.open-meteo.com/v1/forecast"
+    ];
+
     async function fetchWeather() {
-      const url = "https://api.open-meteo.com/v1/forecast"
-        + "?latitude=33.95&longitude=-83.38"
+      const query = "?latitude=33.95&longitude=-83.38"
         + "&current=temperature_2m,weather_code,precipitation";
 
-      try {
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const data = await res.json();
+      let data = null, lastErr = null;
+      for (const base of CURRENT_ENDPOINTS) {
+        try {
+          const res = await fetch(base + query, { cache: "no-store" });
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const json = await res.json();
+          if (!json.current) throw new Error("no current data in response");
+          data = json;
+          break;
+        } catch (err) {
+          lastErr = err;
+        }
+      }
 
-        const current = data.current;
-        const tempF = cToF(current.temperature_2m);
-        const code = current.weather_code;
-        const precip = current.precipitation;
-
-        const snowing = SNOW_CODES.has(code);
-
-        updatePage(snowing, tempF, code);
-      } catch (err) {
+      if (!data) {
         document.getElementById("answer").textContent = "NO";
         document.getElementById("details").textContent =
           "Error checking the weather. Odds are it is not snowing in Athens, GA.";
         document.body.classList.remove("yes");
         document.body.classList.add("no");
         document.getElementById("updated").textContent = "";
-        console.error(err);
+        console.error("All weather endpoints failed:", lastErr);
         stopSnow();
+        return;
       }
+
+      const current = data.current;
+      const tempF = cToF(current.temperature_2m);
+      const code = current.weather_code;
+      const snowing = SNOW_CODES.has(code);
+
+      updatePage(snowing, tempF, code);
     }
 
     function cToF(c) {
@@ -265,41 +280,53 @@ function updatePage(snowing, tempF, code) {
 
 async function fetchHistoricalSnow() {
   const displayEl = document.getElementById("last-snow-date");
-  
-  // 1. Get current date in YYYY-MM-DD format
-  const today = new Date().toISOString().split('T')[0];
-  
-  const url = `https://historical-forecast-api.open-meteo.com/v1/forecast`
+
+  // Ignore trace / model-noise amounts. Real snow events are well above this;
+  // this filters out sub-millimeter artifacts (e.g. a bogus 0.07 cm "snow" day).
+  const MIN_SNOWFALL_CM = 0.1;
+
+  // Rolling ~3-year window so "most recent" stays correct as time passes.
+  const today = new Date();
+  const start = new Date(today);
+  start.setFullYear(start.getFullYear() - 3);
+  const fmt = (d) => d.toISOString().split('T')[0];
+
+  // Use the ERA5 reanalysis archive (observation-based) instead of the archived
+  // FORECAST API — the latter reports phantom trace snowfall on days it did not
+  // actually snow, which is what produced the wrong date.
+  const url = `https://archive-api.open-meteo.com/v1/archive`
     + `?latitude=33.95&longitude=-83.38`
-    + `&start_date=2026-01-01&end_date=${today}`
-    + `&hourly=snowfall&timezone=America%2FNew_York`;
+    + `&start_date=${fmt(start)}&end_date=${fmt(today)}`
+    + `&daily=snowfall_sum&timezone=America%2FNew_York`;
 
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error("Historical API Error");
     const data = await res.json();
 
-    const times = data.hourly.time;
-    const snowfall = data.hourly.snowfall;
+    const times = data.daily.time;
+    const snowfall = data.daily.snowfall_sum;
     let foundDate = null;
 
-    // 2. Loop backwards from the end of the array to find the most recent snow
+    // Loop backwards to find the most recent day with meaningful snowfall.
     for (let i = snowfall.length - 1; i >= 0; i--) {
-      if (snowfall[i] > 0) {
-        foundDate = new Date(times[i]);
+      if ((snowfall[i] || 0) >= MIN_SNOWFALL_CM) {
+        // Append a time so the date string is parsed in local time, not UTC
+        // (which would shift it a day earlier in US time zones).
+        foundDate = new Date(times[i] + "T00:00:00");
         break;
       }
     }
 
     if (foundDate) {
-      // Format as "January 15, 2024"
+      // Format as "January 31, 2026"
       displayEl.textContent = foundDate.toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       });
     } else {
-      displayEl.textContent = "None recorded since Jan 2022";
+      displayEl.textContent = "None recorded in the last 3 years";
     }
   } catch (err) {
     console.error("Historical fetch failed:", err);
